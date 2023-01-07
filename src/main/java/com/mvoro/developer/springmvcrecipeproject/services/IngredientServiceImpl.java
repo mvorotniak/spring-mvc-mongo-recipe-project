@@ -1,6 +1,5 @@
 package com.mvoro.developer.springmvcrecipeproject.services;
 
-import java.util.Objects;
 import java.util.Optional;
 
 import org.springframework.stereotype.Service;
@@ -13,7 +12,6 @@ import com.mvoro.developer.springmvcrecipeproject.domain.Ingredient;
 import com.mvoro.developer.springmvcrecipeproject.domain.Recipe;
 import com.mvoro.developer.springmvcrecipeproject.domain.UnitOfMeasure;
 import com.mvoro.developer.springmvcrecipeproject.exceptions.NotFoundException;
-import com.mvoro.developer.springmvcrecipeproject.repositories.RecipeRepository;
 import com.mvoro.developer.springmvcrecipeproject.repositories.reactive.RecipeReactiveRepository;
 import com.mvoro.developer.springmvcrecipeproject.repositories.reactive.UnitOfMeasureReactiveRepository;
 import lombok.AllArgsConstructor;
@@ -30,8 +28,6 @@ public class IngredientServiceImpl implements IngredientService {
     private final IngredientCommandToIngredient ingredientCommandToIngredient;
 
     private final RecipeReactiveRepository recipeReactiveRepository;
-
-    private final RecipeRepository recipeRepository;
 
     private final UnitOfMeasureReactiveRepository unitOfMeasureRepository;
 
@@ -52,7 +48,8 @@ public class IngredientServiceImpl implements IngredientService {
     @Override
     @Transactional
     public Mono<IngredientCommand> saveIngredientCommand(final IngredientCommand ingredientCommand) {
-        Optional<Recipe> recipeOptional = this.recipeRepository.findById(ingredientCommand.getRecipeId());
+        Optional<Recipe> recipeOptional = this.recipeReactiveRepository.findById(ingredientCommand.getRecipeId())
+            .blockOptional();
 
         Ingredient ingredient = this.ingredientCommandToIngredient.convert(ingredientCommand);
 
@@ -92,7 +89,7 @@ public class IngredientServiceImpl implements IngredientService {
 
     @Override
     public Mono<Void> deleteByRecipeAndIngredientId(String recipeId, String id) {
-        Optional<Recipe> recipeOptional = this.recipeRepository.findById(recipeId);
+        Optional<Recipe> recipeOptional = this.recipeReactiveRepository.findById(recipeId).blockOptional();
         if (recipeOptional.isPresent()) {
             Recipe recipe = recipeOptional.get();
             recipe.getIngredients().removeIf(ingredient -> ingredient.getId().equals(id));

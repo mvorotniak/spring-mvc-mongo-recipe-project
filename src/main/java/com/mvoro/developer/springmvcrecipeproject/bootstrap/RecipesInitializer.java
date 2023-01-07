@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.util.HashSet;
 import java.util.Set;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationListener;
 import org.springframework.context.annotation.Profile;
 import org.springframework.context.event.ContextRefreshedEvent;
@@ -19,6 +20,9 @@ import com.mvoro.developer.springmvcrecipeproject.exceptions.NotFoundException;
 import com.mvoro.developer.springmvcrecipeproject.repositories.CategoryRepository;
 import com.mvoro.developer.springmvcrecipeproject.repositories.RecipeRepository;
 import com.mvoro.developer.springmvcrecipeproject.repositories.UnitOfMeasureRepository;
+import com.mvoro.developer.springmvcrecipeproject.repositories.reactive.CategoryReactiveRepository;
+import com.mvoro.developer.springmvcrecipeproject.repositories.reactive.RecipeReactiveRepository;
+import com.mvoro.developer.springmvcrecipeproject.repositories.reactive.UnitOfMeasureReactiveRepository;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
@@ -31,6 +35,15 @@ public class RecipesInitializer implements ApplicationListener<ContextRefreshedE
     private final UnitOfMeasureRepository unitOfMeasureRepository;
 
     private final RecipeRepository recipeRepository;
+
+    @Autowired
+    private CategoryReactiveRepository categoryReactiveRepository;
+
+    @Autowired
+    private UnitOfMeasureReactiveRepository unitOfMeasureReactiveRepository;
+
+    @Autowired
+    private RecipeReactiveRepository recipeReactiveRepository;
 
     // Constructor injection is recommended over field injection
     public RecipesInitializer(
@@ -50,6 +63,11 @@ public class RecipesInitializer implements ApplicationListener<ContextRefreshedE
         loadUom();
         recipeRepository.saveAll(getRecipes());
         log.info("Finished populating MongoDB");
+
+        log.info("### Reactive Repositories ###");
+        log.info("{} categories in Category Reactive Repository.", categoryReactiveRepository.count().block());
+        log.info("{} unitOfMeasures in UnitOfMeasure Reactive Repository.", unitOfMeasureReactiveRepository.count().block());
+        log.info("{} recipes in Recipe Reactive Repository.", recipeReactiveRepository.count().block());
     }
 
     private void loadCategories(){

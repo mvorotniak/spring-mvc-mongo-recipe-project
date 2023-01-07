@@ -1,12 +1,13 @@
 package com.mvoro.developer.springmvcrecipeproject.services;
 
 import com.mvoro.developer.springmvcrecipeproject.commands.IngredientCommand;
+import reactor.core.publisher.Mono;
 
 public interface IngredientService {
 
-    IngredientCommand findCommandByRecipeAndIngredientId(String recipeId, String id);
+    Mono<IngredientCommand> findCommandByRecipeAndIngredientId(String recipeId, String id);
 
-    IngredientCommand saveIngredientCommand(IngredientCommand ingredientCommand);
+    Mono<IngredientCommand> saveIngredientCommand(IngredientCommand ingredientCommand);
 
-    void deleteByRecipeAndIngredientId(String recipeId, String id);
+    Mono<Void> deleteByRecipeAndIngredientId(String recipeId, String id);
 }

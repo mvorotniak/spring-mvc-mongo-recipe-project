@@ -1,6 +1,6 @@
 package com.mvoro.developer.springmvcrecipeproject.controllers;
 
-import java.util.Set;
+import java.util.List;
 
 import javax.validation.Valid;
 
@@ -18,9 +18,11 @@ import com.mvoro.developer.springmvcrecipeproject.commands.UnitOfMeasureCommand;
 import com.mvoro.developer.springmvcrecipeproject.services.IngredientService;
 import com.mvoro.developer.springmvcrecipeproject.services.RecipeService;
 import com.mvoro.developer.springmvcrecipeproject.services.UnitOfMeasureService;
+import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
+@AllArgsConstructor
 @Controller
 public class IngredientController {
 
@@ -29,16 +31,6 @@ public class IngredientController {
     private final IngredientService ingredientService;
 
     private final UnitOfMeasureService unitOfMeasureService;
-
-    public IngredientController(
-        RecipeService recipeService,
-        IngredientService ingredientService,
-        UnitOfMeasureService unitOfMeasureService
-    ) {
-        this.recipeService = recipeService;
-        this.ingredientService = ingredientService;
-        this.unitOfMeasureService = unitOfMeasureService;
-    }
 
     @GetMapping("/recipe/{id}/ingredients")
     public String listIngredientsByRecipe(@PathVariable final String id, final Model model) {
@@ -52,7 +44,7 @@ public class IngredientController {
     public String showIngredient(@PathVariable("recipe_id") final String recipeId, @PathVariable final String id,
         final Model model) {
 
-        model.addAttribute("ingredient", ingredientService.findCommandByRecipeAndIngredientId(recipeId, id));
+        model.addAttribute("ingredient", ingredientService.findCommandByRecipeAndIngredientId(recipeId, id).block());
 
         return "recipe/ingredient/show";
     }
@@ -61,9 +53,11 @@ public class IngredientController {
     public String updateIngredient(@PathVariable("recipe_id") final String recipeId, @PathVariable final String id,
         final Model model) {
 
-        final IngredientCommand ingredientCommand = ingredientService.findCommandByRecipeAndIngredientId(recipeId, id);
+        final IngredientCommand ingredientCommand = ingredientService.findCommandByRecipeAndIngredientId(recipeId, id).block();
         ingredientCommand.setRecipeId(recipeId);
-        final Set<UnitOfMeasureCommand> unitOfMeasureCommandSet = unitOfMeasureService.findAllCommand();
+        final List<UnitOfMeasureCommand> unitOfMeasureCommandSet = unitOfMeasureService.findAllCommand()
+            .collectList()
+            .block();
 
         model.addAttribute("ingredient", ingredientCommand);
         model.addAttribute("uoms", unitOfMeasureCommandSet);
@@ -81,7 +75,7 @@ public class IngredientController {
             return "recipe/ingredient/form";
         }
 
-        final IngredientCommand savedIngredientCommand = ingredientService.saveIngredientCommand(ingredientCommand);
+        final IngredientCommand savedIngredientCommand = ingredientService.saveIngredientCommand(ingredientCommand).block();
 
         return "redirect:/recipe/" + savedIngredientCommand.getRecipeId() + "/ingredient/" + savedIngredientCommand.getId() + "/show";
     }
@@ -91,7 +85,9 @@ public class IngredientController {
         IngredientCommand ingredientCommand = new IngredientCommand();
         ingredientCommand.setRecipeId(id);
 
-        Set<UnitOfMeasureCommand> unitOfMeasureCommandSet = unitOfMeasureService.findAllCommand();
+        List<UnitOfMeasureCommand> unitOfMeasureCommandSet = unitOfMeasureService.findAllCommand()
+            .collectList()
+            .block();
 
         model.addAttribute("ingredient", ingredientCommand);
         model.addAttribute("uoms", unitOfMeasureCommandSet);
@@ -102,7 +98,7 @@ public class IngredientController {
     @GetMapping("/recipe/{recipe_id}/ingredient/{id}/delete")
     public String deleteIngredient(@PathVariable("recipe_id") String recipeId, @PathVariable String id) {
         log.info("Deleting ingredient with id {}...", id);
-        ingredientService.deleteByRecipeAndIngredientId(recipeId, id);
+        ingredientService.deleteByRecipeAndIngredientId(recipeId, id).block();
 
         // Redirect to list of ingredients
         return "redirect:/recipe/" + recipeId + "/ingredients";

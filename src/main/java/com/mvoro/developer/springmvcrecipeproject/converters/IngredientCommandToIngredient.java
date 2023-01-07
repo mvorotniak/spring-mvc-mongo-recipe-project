@@ -1,5 +1,7 @@
 package com.mvoro.developer.springmvcrecipeproject.converters;
 
+import java.util.Objects;
+
 import org.springframework.core.convert.converter.Converter;
 import org.springframework.stereotype.Component;
 
@@ -27,7 +29,9 @@ public class IngredientCommandToIngredient implements Converter<IngredientComman
         }
 
         Ingredient ingredient = new Ingredient();
-        ingredient.setId(source.getId());
+        if (Objects.nonNull(source.getId()) && !source.getId().isEmpty()) {
+            ingredient.setId(source.getId());
+        }
         ingredient.setDescription(source.getDescription());
         ingredient.setAmount(source.getAmount());
 

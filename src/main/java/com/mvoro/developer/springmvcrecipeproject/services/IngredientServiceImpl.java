@@ -1,104 +1,117 @@
 package com.mvoro.developer.springmvcrecipeproject.services;
 
-import java.math.BigDecimal;
+import java.util.Objects;
 import java.util.Optional;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.mvoro.developer.springmvcrecipeproject.commands.IngredientCommand;
-import com.mvoro.developer.springmvcrecipeproject.commands.RecipeCommand;
-import com.mvoro.developer.springmvcrecipeproject.commands.UnitOfMeasureCommand;
+import com.mvoro.developer.springmvcrecipeproject.converters.IngredientCommandToIngredient;
+import com.mvoro.developer.springmvcrecipeproject.converters.IngredientToIngredientCommand;
+import com.mvoro.developer.springmvcrecipeproject.domain.Ingredient;
+import com.mvoro.developer.springmvcrecipeproject.domain.Recipe;
+import com.mvoro.developer.springmvcrecipeproject.domain.UnitOfMeasure;
 import com.mvoro.developer.springmvcrecipeproject.exceptions.NotFoundException;
+import com.mvoro.developer.springmvcrecipeproject.repositories.RecipeRepository;
+import com.mvoro.developer.springmvcrecipeproject.repositories.reactive.RecipeReactiveRepository;
+import com.mvoro.developer.springmvcrecipeproject.repositories.reactive.UnitOfMeasureReactiveRepository;
+import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import reactor.core.publisher.Mono;
 
 @Slf4j
+@AllArgsConstructor
 @Service
 public class IngredientServiceImpl implements IngredientService {
 
-    private final RecipeService recipeService;
+    private final IngredientToIngredientCommand ingredientToIngredientCommand;
 
-    private final UnitOfMeasureService unitOfMeasureService;
+    private final IngredientCommandToIngredient ingredientCommandToIngredient;
 
-    public IngredientServiceImpl(
-        RecipeService recipeService,
-        UnitOfMeasureService unitOfMeasureService
-    ) {
-        this.recipeService = recipeService;
-        this.unitOfMeasureService = unitOfMeasureService;
-    }
+    private final RecipeReactiveRepository recipeReactiveRepository;
+
+    private final RecipeRepository recipeRepository;
+
+    private final UnitOfMeasureReactiveRepository unitOfMeasureRepository;
 
     @Override
-    public IngredientCommand findCommandByRecipeAndIngredientId(String recipeId, String id) {
-        RecipeCommand recipeCommand = recipeService.findCommandById(recipeId);
+    public Mono<IngredientCommand> findCommandByRecipeAndIngredientId(String recipeId, String id) {
+        return this.recipeReactiveRepository.findById(recipeId)
+            .map(recipe -> recipe.getIngredients().stream()
+                .filter(ingredient -> ingredient.getId().equals(id))
+                .findFirst())
+            .filter(Optional::isPresent)
+            .mapNotNull(ingredient -> {
+                IngredientCommand ingredientCommand = this.ingredientToIngredientCommand.convert(ingredient.get());
+                ingredientCommand.setRecipeId(recipeId);
 
-        Optional<IngredientCommand> ingredientCommandOptional = findIngredientCommandById(recipeCommand, id);
-
-        if (ingredientCommandOptional.isEmpty()) {
-            throw new NotFoundException("Unable to find ingredient with id " + id + " in recipe with id " + recipeId);
-        }
-
-        return ingredientCommandOptional.get();
+                return ingredientCommand;
+            });
     }
 
     @Override
     @Transactional
-    public IngredientCommand saveIngredientCommand(final IngredientCommand ingredientCommand) {
-        RecipeCommand recipeCommand = recipeService.findCommandById(ingredientCommand.getRecipeId());
-        Optional<IngredientCommand> ingredientCommandOptional = findIngredientCommandById(recipeCommand, ingredientCommand.getId());
+    public Mono<IngredientCommand> saveIngredientCommand(final IngredientCommand ingredientCommand) {
+        Optional<Recipe> recipeOptional = this.recipeRepository.findById(ingredientCommand.getRecipeId());
 
-        updateOrAddIngredient(recipeCommand, ingredientCommandOptional, ingredientCommand);
+        Ingredient ingredient = this.ingredientCommandToIngredient.convert(ingredientCommand);
 
-        RecipeCommand savedRecipeCommand = recipeService.saveRecipeCommand(recipeCommand);
+        if (recipeOptional.isPresent()) {
+            Recipe recipe = recipeOptional.get();
 
-        return findIngredientCommandById(savedRecipeCommand, ingredientCommand.getId())
-            .orElse(findIngredientCommandByAttributes(savedRecipeCommand, ingredientCommand.getDescription(), ingredientCommand.getAmount(),
-                ingredientCommand.getUnitOfMeasureCommand().getId()));
-    }
+            Optional<Ingredient> ingredientOptional = recipe.getIngredients().stream()
+                .filter(i -> i.getId().equals(ingredientCommand.getId()))
+                .findFirst();
 
-    @Override
-    public void deleteByRecipeAndIngredientId(String recipeId, String id) {
-        RecipeCommand recipeCommand = recipeService.findCommandById(recipeId);
-        recipeCommand.getIngredientCommands().removeIf(ingredientCommand -> ingredientCommand.getId().equals(id));
-        recipeService.saveRecipeCommand(recipeCommand);
-        log.debug("Deleted ingredient with id {}", id);
-    }
+            if (ingredientOptional.isPresent()) {
+                Ingredient i = ingredientOptional.get();
+                updateIngredient(i, ingredientCommand);
+            } else {
+                recipe.getIngredients().add(ingredient);
+            }
 
-    private Optional<IngredientCommand> findIngredientCommandById(final RecipeCommand recipeCommand, final String id) {
-        return recipeCommand.getIngredientCommands().stream()
-            .filter(command -> command.getId().equals(id))
-            .findFirst();
-    }
+            Recipe savedRecipe = this.recipeReactiveRepository.save(recipe).block();
 
-    private IngredientCommand findIngredientCommandByAttributes(final RecipeCommand recipeCommand, final String description,
-        final BigDecimal amount, final String uomId) {
+            return Optional.ofNullable(savedRecipe)
+                .flatMap(r -> r.getIngredients().stream()
+                    .filter(i -> i.getId().equals(ingredient.getId()))
+                    .map(i -> {
+                        IngredientCommand command = this.ingredientToIngredientCommand.convert(i);
+                        command.setRecipeId(ingredientCommand.getRecipeId());
 
-        return recipeCommand.getIngredientCommands().stream()
-            .filter(ingredientCommand -> ingredientCommand.getDescription().equals(description))
-            .filter(ingredientCommand -> ingredientCommand.getAmount().equals(amount))
-            .filter(ingredientCommand -> ingredientCommand.getUnitOfMeasureCommand().getId().equals(uomId))
-            .findFirst()
-            .orElse(null);
-    }
-
-    private void updateOrAddIngredient(RecipeCommand recipeCommand,
-        Optional<IngredientCommand> ingredientCommandOptional, IngredientCommand ingredientCommand) {
-
-        if (ingredientCommandOptional.isPresent()) {
-            updateIngredientCommand(ingredientCommandOptional.get(), ingredientCommand);
+                        return command;
+                    })
+                    .findFirst())
+                .map(Mono::just)
+                .orElse(Mono.empty());
         } else {
-            recipeCommand.getIngredientCommands().add(ingredientCommand);
+            throw new NotFoundException(
+                String.format("Recipe with id=[%s] was not found in Database.", ingredientCommand.getRecipeId()));
         }
     }
 
-    private void updateIngredientCommand(IngredientCommand fromIngredientCommand, IngredientCommand toIngredientCommand) {
-        fromIngredientCommand.setDescription(toIngredientCommand.getDescription());
-        fromIngredientCommand.setAmount(toIngredientCommand.getAmount());
+    @Override
+    public Mono<Void> deleteByRecipeAndIngredientId(String recipeId, String id) {
+        Optional<Recipe> recipeOptional = this.recipeRepository.findById(recipeId);
+        if (recipeOptional.isPresent()) {
+            Recipe recipe = recipeOptional.get();
+            recipe.getIngredients().removeIf(ingredient -> ingredient.getId().equals(id));
+            this.recipeReactiveRepository.save(recipe).block();
+            log.debug("Deleted ingredient with id {}", id);
+        }
 
-        UnitOfMeasureCommand unitOfMeasureCommand =
-            unitOfMeasureService.findCommandById(toIngredientCommand.getUnitOfMeasureCommand().getId());
-        if (unitOfMeasureCommand != null) {
-            fromIngredientCommand.setUnitOfMeasureCommand(unitOfMeasureCommand);
+        return Mono.empty();
+    }
+
+    private void updateIngredient(Ingredient fromIngredient, IngredientCommand toIngredientCommand) {
+        fromIngredient.setDescription(toIngredientCommand.getDescription());
+        fromIngredient.setAmount(toIngredientCommand.getAmount());
+
+        UnitOfMeasure unitOfMeasure = unitOfMeasureRepository
+            .findById(toIngredientCommand.getUnitOfMeasureCommand().getId()).block();
+        if (unitOfMeasure != null) {
+            fromIngredient.setUnitOfMeasure(unitOfMeasure);
         }
     }
 }

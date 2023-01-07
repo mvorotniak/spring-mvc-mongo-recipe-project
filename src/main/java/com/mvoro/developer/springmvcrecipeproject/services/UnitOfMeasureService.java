@@ -1,15 +1,15 @@
 package com.mvoro.developer.springmvcrecipeproject.services;
 
-import java.util.Set;
-
 import com.mvoro.developer.springmvcrecipeproject.commands.UnitOfMeasureCommand;
 import com.mvoro.developer.springmvcrecipeproject.domain.UnitOfMeasure;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 public interface UnitOfMeasureService {
 
-    Set<UnitOfMeasure> findAll();
+    Flux<UnitOfMeasure> findAll();
 
-    Set<UnitOfMeasureCommand> findAllCommand();
+    Flux<UnitOfMeasureCommand> findAllCommand();
 
-    UnitOfMeasureCommand findCommandById(String id);
+    Mono<UnitOfMeasureCommand> findCommandById(String id);
 }

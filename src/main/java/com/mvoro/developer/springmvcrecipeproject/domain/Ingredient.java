@@ -1,8 +1,8 @@
 package com.mvoro.developer.springmvcrecipeproject.domain;
 
 import java.math.BigDecimal;
+import java.util.UUID;
 
-import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.DBRef;
 
 import lombok.Getter;
@@ -26,8 +26,7 @@ public class Ingredient {
         this.unitOfMeasure = unitOfMeasure;
     }
 
-    @Id
-    private String id;
+    private String id = UUID.randomUUID().toString();
 
     private String description;
 

@@ -1,10 +1,8 @@
 package com.mvoro.developer.springmvcrecipeproject.controllers;
 
 import java.io.ByteArrayInputStream;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.http.HttpResponse;
 
 import javax.servlet.http.HttpServletResponse;
 
@@ -19,7 +17,6 @@ import org.springframework.web.multipart.MultipartFile;
 import com.mvoro.developer.springmvcrecipeproject.commands.RecipeCommand;
 import com.mvoro.developer.springmvcrecipeproject.services.ImageService;
 import com.mvoro.developer.springmvcrecipeproject.services.RecipeService;
-
 import lombok.extern.slf4j.Slf4j;
 import org.apache.tomcat.util.http.fileupload.IOUtils;
 
@@ -41,21 +38,21 @@ public class ImageController {
 
     @GetMapping("recipes/{id}/image")
     public String showImageUploadForm(@PathVariable final String id, final Model model) {
-        model.addAttribute("recipe", this.recipeService.findCommandById(id));
+        model.addAttribute("recipe", this.recipeService.findCommandById(id).block());
 
         return "recipe/imageUploadForm";
     }
 
     @PostMapping("recipes/{id}/image")
     public String saveImage(@PathVariable final String id, @RequestParam("imageFile") final MultipartFile file) {
-        this.imageService.uploadImageForRecipeId(id, file);
+        this.imageService.uploadImageForRecipeId(id, file).block();
 
         return "redirect:/recipes/" + id + "/show";
     }
 
     @GetMapping("recipes/{id}/recipeImage")
     public void loadImage(@PathVariable final String id, final HttpServletResponse response) throws IOException {
-        final RecipeCommand recipeCommand = this.recipeService.findCommandById(id);
+        final RecipeCommand recipeCommand = this.recipeService.findCommandById(id).block();
 
         if (recipeCommand.getImage() != null) {
             log.info("Loading image for recipe [{}]", id);
